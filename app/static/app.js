@@ -283,6 +283,12 @@ async function openDetails(id) {
   series.createPriceLine({ price: c.purchase_price, color: css("--cost"), lineStyle: LC.LineStyle.Dashed, lineWidth: 1, axisLabelVisible: true, title: "покупка" });
   detailsChart.timeScale().fitContent();
 
+  $("#d-debug").hidden = !c.debug;
+  const stamp = Date.now();
+  for (const a of document.querySelectorAll("#d-debug [data-debug]")) {
+    a.href = `/api/components/${c.id}/debug.${a.dataset.debug}?t=${stamp}`;
+  }
+
   const sourceName = { auto: "авто", manual: "вручную", bookmarklet: "закладка" };
   $("#d-history").innerHTML = c.history.length
     ? c.history.map((p) => `<tr>

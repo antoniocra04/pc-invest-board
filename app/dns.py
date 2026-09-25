@@ -7,11 +7,13 @@ from dataclasses import dataclass
 from bs4 import BeautifulSoup
 
 _PRODUCT_RE = re.compile(r"dns-shop\.ru/product/([0-9a-zA-Z]+)(?:[/?#]|$)")
-_NUMBER_RE = re.compile(r"\d[\d    ]*(?:[.,]\d{1,2})?")
+_NUMBER_RE = re.compile(r"\d[\d \u00a0\u2009\u202f]*(?:[.,]\d{1,2})?")
 
-# Product page elements. The price block is filled in by JS after the page loads.
+# Product page elements. The price block is in the server HTML but empty; JS fills it in
+# from a POST to /ajax-state/product-buy/ after the page loads.
 PRICE_SELECTOR = ".product-buy__price"
 TITLE_SELECTOR = ".product-card-top__title"
+PRICE_AJAX_MARKER = "/ajax-state/product-buy/"
 UNAVAILABLE_MARKERS = (
     "нет в наличии",
     "товара нет в наличии",
@@ -44,7 +46,7 @@ def parse_price(text: str | None) -> float | None:
     match = _NUMBER_RE.search(text)
     if not match:
         return None
-    raw = re.sub(r"[    ]", "", match.group(0)).replace(",", ".")
+    raw = re.sub(r"[ \u00a0\u2009\u202f]", "", match.group(0)).replace(",", ".")
     try:
         value = float(raw)
     except ValueError:
@@ -79,7 +81,26 @@ def _price_from_json_ld(soup: BeautifulSoup) -> float | None:
     return None
 
 
-def parse_product_page(html: str) -> ProductPage:
+def price_from_ajax(payloads: list) -> float | None:
+    """Current price from the JSON the page got from /ajax-state/product-buy/.
+
+    Looks for {"price": {"current": 52999, ...}} anywhere in the response, so it survives
+    small changes in how the response is wrapped.
+    """
+    stack = list(payloads)
+    while stack:
+        item = stack.pop(0)
+        if isinstance(item, list):
+            stack.extend(item)
+        elif isinstance(item, dict):
+            price = item.get("price")
+            if isinstance(price, dict) and isinstance(price.get("current"), (int, float)) and price["current"] > 0:
+                return float(price["current"])
+            stack.extend(v for v in item.values() if isinstance(v, (dict, list)))
+    return None
+
+
+def parse_product_page(html: str, ajax_payloads: list | None = None) -> ProductPage:
     soup = BeautifulSoup(html, "html.parser")
     page = ProductPage()
 
@@ -94,6 +115,8 @@ def parse_product_page(html: str) -> ProductPage:
     price_el = soup.select_one(PRICE_SELECTOR)
     if price_el:
         page.price = parse_price(_own_text(price_el)) or parse_price(price_el.get_text(" "))
+    if page.price is None and ajax_payloads:
+        page.price = price_from_ajax(ajax_payloads)
     if page.price is None:
         page.price = _price_from_json_ld(soup)
     if page.price is None:

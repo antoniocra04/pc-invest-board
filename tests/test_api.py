@@ -99,3 +99,17 @@ def test_import_is_all_or_nothing(client):
 def test_index_served(client):
     res = client.get("/")
     assert res.status_code == 200 and "ПК-портфель" in res.text
+
+
+def test_debug_snapshot(client, tmp_path):
+    cid = client.post("/api/components", json={"name": "SSD", "purchase_price": 9000}).json()["id"]
+    assert client.get(f"/api/components/{cid}").json()["debug"] is False
+    assert client.get(f"/api/components/{cid}/debug.png").status_code == 404
+
+    (tmp_path / "debug").mkdir()
+    (tmp_path / "debug" / f"{cid}.png").write_bytes(b"png")
+    (tmp_path / "debug" / f"{cid}.html").write_text("<script>alert(1)</script>")
+    assert client.get(f"/api/components/{cid}").json()["debug"] is True
+    html = client.get(f"/api/components/{cid}/debug.html")
+    assert html.headers["content-type"].startswith("text/plain")
+    assert client.get(f"/api/components/{cid}/debug.sqlite3").status_code == 404

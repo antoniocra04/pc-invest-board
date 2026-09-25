@@ -141,6 +141,12 @@
       </div>
       <div class="stats" id="d-stats"></div>
       <div id="d-chart" class="chart small-chart"></div>
+      <p id="d-debug" class="small muted" hidden>
+        Последняя неудачная проверка — что увидел браузер:
+        <a data-debug="png" target="_blank" rel="noopener">скриншот</a> ·
+        <a data-debug="html" target="_blank" rel="noopener">HTML</a> ·
+        <a data-debug="json" target="_blank" rel="noopener">ответы DNS</a>
+      </p>
       <form id="manual-price" class="inline-form">
         <input name="price" type="number" min="1" step="1" placeholder="Цена сейчас, ₽" required>
         <input name="date" type="date">

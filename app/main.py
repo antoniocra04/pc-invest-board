@@ -150,7 +150,18 @@ def create_app(settings: Settings | None = None, fetch=None) -> FastAPI:
             **portfolio.component_summary(component, prices),
             "series": [{"date": d, "price": p} for d, p in portfolio.component_series(component, prices)],
             "history": list(reversed(prices)),
+            "debug": (settings.debug_dir / f"{component_id}.png").exists(),
         }
+
+    DEBUG_TYPES = {"png": "image/png", "html": "text/plain; charset=utf-8", "json": "application/json"}
+
+    @app.get("/api/components/{component_id}/debug.{kind}", include_in_schema=False)
+    def component_debug(component_id: int, kind: str):
+        """What the browser saw on the last failed check (HTML is served as text, never rendered)."""
+        path = settings.debug_dir / f"{component_id}.{kind}"
+        if kind not in DEBUG_TYPES or not path.exists():
+            raise HTTPException(404, "Снимка нет")
+        return FileResponse(path, media_type=DEBUG_TYPES[kind])
 
     @app.post("/api/components/{component_id}/prices", status_code=201)
     def add_manual_price(component_id: int, body: PriceIn):

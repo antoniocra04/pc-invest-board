@@ -54,5 +54,9 @@ class Settings:
     def browser_profile_dir(self) -> Path:
         return self.data_dir / "browser-profile"
 
+    @property
+    def debug_dir(self) -> Path:
+        return self.data_dir / "debug"
+
     def now(self) -> datetime:
         return datetime.now(self.tz).replace(tzinfo=None, microsecond=0)

@@ -60,3 +60,17 @@ def test_parse_qrator_challenge():
     page = parse_product_page(html)
     assert page.blocked is True
     assert page.price is None
+
+
+def test_price_from_ajax_fallback():
+    ajax = [{"result": True, "data": {"states": [
+        {"id": "as-1", "data": {"name": "RTX", "price": {"current": 64999, "previous": 69999}}}]}}]
+    html = '<h1 class="product-card-top__title">RTX</h1><div class="product-buy"><div class="product-buy__price"></div></div>'
+    page = parse_product_page(html, ajax)
+    assert page.price == 64999
+    assert page.available is True
+
+
+def test_markup_price_wins_over_ajax():
+    ajax = [{"data": {"price": {"current": 1}}}]
+    assert parse_product_page(PRODUCT_HTML, ajax).price == 52999
