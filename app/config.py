@@ -33,7 +33,9 @@ class Settings:
     check_times: list[time] = field(default_factory=lambda: _times(os.environ.get("CHECK_TIMES", "10:00")))
     # Run the scheduler at all (tests switch it off).
     scheduler_enabled: bool = field(default_factory=lambda: _bool("SCHEDULER_ENABLED", True))
-    # Headed Chromium under Xvfb passes the DNS anti-bot check more often than headless.
+    # Browser engine: "camoufox" (Firefox with a spoofed desktop fingerprint) or "chromium" (patchright).
+    browser: str = field(default_factory=lambda: os.environ.get("BROWSER", "camoufox").strip().lower())
+    # Headed browser under Xvfb passes the DNS anti-bot check more often than headless.
     headless: bool = field(default_factory=lambda: _bool("HEADLESS", False))
     # Optional DNS city slug (city_path cookie), e.g. "moscow", "spb". Prices differ by city.
     dns_city: str = field(default_factory=lambda: os.environ.get("DNS_CITY", "").strip())
@@ -49,10 +51,6 @@ class Settings:
     @property
     def db_path(self) -> Path:
         return self.data_dir / "board.sqlite3"
-
-    @property
-    def browser_profile_dir(self) -> Path:
-        return self.data_dir / "browser-profile"
 
     @property
     def debug_dir(self) -> Path:

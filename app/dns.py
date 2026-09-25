@@ -28,7 +28,8 @@ class ProductPage:
     price: float | None = None
     name: str | None = None
     available: bool | None = None
-    blocked: bool = False  # anti-bot challenge page instead of the product
+    blocked: bool = False  # anti-bot page instead of the product
+    forbidden: bool = False  # the anti-bot's final "403 Доступ запрещён" verdict
 
 
 def product_code(url: str | None) -> str | None:
@@ -132,5 +133,11 @@ def parse_product_page(html: str, ajax_payloads: list | None = None) -> ProductP
         if any(marker in text for marker in UNAVAILABLE_MARKERS):
             page.available = False
 
-    page.blocked = page.price is None and page.name is None and "__qrator" in html
+    if page.price is None:
+        head = soup.title.get_text(strip=True) if soup.title else ""
+        text = soup.get_text(" ", strip=True).lower()
+        page.forbidden = "403" in head or ("доступ к сайту" in text and "запрещ" in text)
+        page.blocked = page.forbidden or (page.name is None and "__qrator" in html)
+        if page.forbidden:
+            page.name = None
     return page

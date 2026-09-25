@@ -74,3 +74,12 @@ def test_price_from_ajax_fallback():
 def test_markup_price_wins_over_ajax():
     ajax = [{"data": {"price": {"current": 1}}}]
     assert parse_product_page(PRODUCT_HTML, ajax).price == 52999
+
+
+def test_parse_qrator_403():
+    html = """<html><head><title>HTTP 403</title></head><body>
+    <div class="title">403 Error</div><div class="sub-title">Forbidden</div>
+    <div class="descr">Доступ к сайту www.dns-shop.ru запрещен.</div></body></html>"""
+    page = parse_product_page(html)
+    assert page.blocked is True and page.forbidden is True
+    assert page.price is None and page.name is None

@@ -15,5 +15,7 @@ services:
       CHECK_TIMES: "10:00"
       # DNS city slug, prices differ by city. Empty = whatever DNS picks by IP.
       DNS_CITY: ""
-      # 1 = headless Chromium without Xvfb (lighter, but gets blocked more often).
+      # camoufox (Firefox with a desktop fingerprint) or chromium (patchright).
+      BROWSER: camoufox
+      # 1 = headless browser without Xvfb (lighter, but gets blocked more often).
       HEADLESS: "0"

@@ -4,15 +4,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     DATA_DIR=/data \
+    DISPLAY=:99 \
     TZ=Europe/Moscow
 
 WORKDIR /app
 
 COPY requirements.txt .
-# Chromium (arm64 builds exist, so this works on a Raspberry Pi 4/5 with a 64-bit OS)
-# plus Xvfb: a headed browser on a virtual screen gets through the DNS anti-bot more often.
+# Both browsers have arm64 builds, so this works on a Raspberry Pi 4/5 with a 64-bit OS:
+# - Camoufox (Firefox with a spoofed desktop fingerprint), downloaded from its GitHub releases;
+# - Chromium for patchright.
+# Plus Xvfb: a headed browser on a virtual screen gets through the DNS anti-bot more often.
 RUN pip install --no-cache-dir -r requirements.txt \
-    && playwright install --with-deps chromium \
+    && patchright install --with-deps chromium \
+    && playwright install-deps firefox \
+    && python -m camoufox fetch \
     && apt-get update \
     && apt-get install -y --no-install-recommends xvfb \
     && rm -rf /var/lib/apt/lists/*

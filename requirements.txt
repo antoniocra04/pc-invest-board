@@ -1,5 +1,9 @@
 fastapi==0.141.1
 uvicorn[standard]==0.54.0
 beautifulsoup4==4.15.0
-playwright==1.63.0
 tzdata==2026.4
+# Browsers: Camoufox drives its Firefox build through Playwright (and needs playwright<1.63),
+# patchright is a stealth fork of Playwright for Chromium.
+camoufox==0.5.6
+playwright==1.62.0
+patchright==1.63.0
