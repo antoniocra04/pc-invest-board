@@ -1,0 +1,19 @@
+services:
+  pc-invest-board:
+    build: .
+    container_name: pc-invest-board
+    restart: unless-stopped
+    init: true          # reaps Chromium child processes
+    shm_size: 512mb     # Chromium needs more than the default 64 MB
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data    # database + browser profile, survives rebuilds
+    environment:
+      TZ: Europe/Moscow
+      # When to check prices, local time, comma separated.
+      CHECK_TIMES: "10:00"
+      # DNS city slug, prices differ by city. Empty = whatever DNS picks by IP.
+      DNS_CITY: ""
+      # 1 = headless Chromium without Xvfb (lighter, but gets blocked more often).
+      HEADLESS: "0"
