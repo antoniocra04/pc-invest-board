@@ -4,10 +4,25 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ПК-портфель</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2316a34a'/><path d='M6 22l6-6 5 4 9-10' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2315803d'/><path d='M6 22l6-6 5 4 9-10' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+  <link rel="preload" href="/static/fonts/onest-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/jetbrains-mono-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.6-4.5M4 4v4h4M4 13a8 8 0 0 0 14.6 4.5M20 20v-4h-4"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+      <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+      <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+      <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 6l7 11H5z" class="solid"/></symbol>
+      <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 18L5 7h14z" class="solid"/></symbol>
+    </defs>
+  </svg>
+
   <header class="topbar">
     <div class="brand">
       <span class="logo" aria-hidden="true">
@@ -16,28 +31,32 @@
       ПК-портфель
     </div>
     <div class="actions">
-      <span id="run-status" class="muted small"></span>
-      <button id="refresh-btn" class="btn">Обновить цены</button>
-      <button id="add-btn" class="btn primary">+ Добавить</button>
+      <span id="run-status" class="run-status" role="status"></span>
+      <button id="refresh-btn" class="btn">
+        <svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg>Обновить цены
+      </button>
+      <button id="add-btn" class="btn primary">
+        <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>Добавить
+      </button>
     </div>
   </header>
 
-  <main>
-    <section class="hero">
-      <div class="muted">Стоимость сборки сейчас</div>
-      <div class="big" id="total-value">—</div>
-      <div class="hero-lines">
-        <span id="total-change" class="chip">—</span>
-        <span class="muted">за всё время</span>
-        <span id="day-change" class="small"></span>
-      </div>
-      <div class="muted small">Вложено: <span id="total-cost">—</span></div>
-    </section>
+  <div class="ticker" id="ticker" hidden>
+    <div class="ticker-track" id="ticker-track"></div>
+  </div>
 
-    <section class="card">
-      <div class="card-head">
-        <h2>Стоимость сборки</h2>
-        <div class="tabs" id="range-tabs">
+  <main>
+    <section class="stage">
+      <div class="stage-head">
+        <div class="quote">
+          <h1 class="quote-value"><span class="visually-hidden">Сборка стоит </span><span id="total-value">—</span></h1>
+          <p class="quote-change" id="total-change"></p>
+          <p class="quote-meta">
+            <span>вложено <b id="total-cost">—</b></span>
+            <span id="day-change"></span>
+          </p>
+        </div>
+        <div class="tabs" id="range-tabs" role="group" aria-label="Период графика">
           <button data-days="30">1М</button>
           <button data-days="90">3М</button>
           <button data-days="180">6М</button>
@@ -45,51 +64,59 @@
           <button data-days="0" class="active">Всё</button>
         </div>
       </div>
-      <div id="main-chart" class="chart"></div>
-      <div class="legend small muted">
-        <span><i class="swatch value"></i>Цена сборки в DNS</span>
-        <span><i class="swatch cost"></i>Сколько заплатил</span>
+      <div id="main-chart" class="chart" role="img" aria-label="График стоимости сборки"></div>
+      <div class="legend">
+        <span><i class="swatch value"></i>цена сборки в DNS</span>
+        <span><i class="swatch cost"></i>сколько заплатил</span>
       </div>
     </section>
 
-    <section class="card">
-      <div class="card-head"><h2>Комплектующие</h2></div>
+    <section class="holdings">
+      <h2>Комплектующие <span class="count" id="count"></span></h2>
       <div id="empty" class="empty" hidden>
         <p>Пока пусто. Добавь первое комплектующее: ссылку на товар в DNS и цену, за которую покупал.</p>
-        <button class="btn primary" data-action="add">+ Добавить комплектующее</button>
+        <button class="btn primary" data-action="add">
+          <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>Добавить комплектующее
+        </button>
       </div>
       <div class="table-wrap">
-      <table class="positions" id="positions">
-        <thead>
-          <tr>
-            <th>Комплектующее</th>
-            <th class="num hide-sm">Куплено</th>
-            <th class="num">Сейчас</th>
-            <th class="num">Изменение</th>
-            <th class="hide-sm">60 дней</th>
-            <th class="hide-sm">Проверено</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+        <table class="positions" id="positions">
+          <thead>
+            <tr>
+              <th>Комплектующее</th>
+              <th class="num hide-sm">Куплено</th>
+              <th class="num">Сейчас</th>
+              <th class="num">Изменение</th>
+              <th class="hide-sm">60 дней</th>
+              <th class="hide-sm">Проверено</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
       </div>
     </section>
 
-    <section class="card tools">
-      <h2>Если DNS не пускает Raspberry Pi</h2>
-      <p class="muted">
-        У DNS стоит антибот-защита. Если автоматическая проверка упирается в неё,
-        цену можно отправить со своего браузера: перетащи кнопку ниже на панель закладок,
-        открой товар на dns-shop.ru и нажми закладку. Откроется эта страница, и цена запишется.
+    <footer class="tools">
+      <div class="tools-text">
+        <h2>Если DNS не пускает Raspberry Pi</h2>
+        <p>
+          Перетащи кнопку на панель закладок, открой товар на dns-shop.ru в своём браузере
+          и нажми закладку. Откроется эта страница, и цена запишется.
+        </p>
+      </div>
+      <div class="tools-actions">
+        <a id="bookmarklet" class="btn bookmarklet" href="#">
+          <svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg>В ПК-портфель
+        </a>
+        <a class="btn ghost" href="/api/export" download="pc-invest-board.json">
+          <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Все данные, JSON
+        </a>
+      </div>
+      <p class="credits">
+        Графики — <a href="https://www.tradingview.com/" target="_blank" rel="noopener">TradingView Lightweight Charts™</a>.
+        Шрифты Onest и JetBrains Mono, OFL.
       </p>
-      <p><a id="bookmarklet" class="btn bookmarklet" href="#">📈 В ПК-портфель</a></p>
-      <p class="small muted">
-        <a href="/api/export" download="pc-invest-board.json">Скачать все данные (JSON)</a>
-      </p>
-      <p class="small muted">
-        Графики: <a href="https://www.tradingview.com/" target="_blank" rel="noopener">TradingView Lightweight Charts™</a>
-      </p>
-    </section>
+    </footer>
   </main>
 
   <dialog id="form-dialog">
@@ -98,7 +125,7 @@
       <label>Ссылка на товар в DNS
         <input name="url" type="url" placeholder="https://www.dns-shop.ru/product/…">
       </label>
-      <label>Название <span class="muted small">(можно пропустить, возьмётся со страницы DNS)</span>
+      <label>Название <span class="hint">можно пропустить, возьмётся со страницы DNS</span>
         <input name="name" type="text" placeholder="Видеокарта …">
       </label>
       <label>Категория
@@ -112,44 +139,48 @@
       </label>
       <div class="row">
         <label>Цена покупки за шт., ₽
-          <input name="purchase_price" type="number" min="1" step="1" required>
+          <input name="purchase_price" type="number" min="1" step="1" inputmode="numeric" required>
         </label>
         <label>Кол-во
-          <input name="quantity" type="number" min="1" step="1" value="1" required>
+          <input name="quantity" type="number" min="1" step="1" value="1" inputmode="numeric" required>
         </label>
       </div>
       <label>Дата покупки
         <input name="purchase_date" type="date" required>
       </label>
-      <p id="form-error" class="error" hidden></p>
+      <p id="form-error" class="error" role="alert" hidden></p>
       <div class="dialog-actions">
-        <button type="button" class="btn" data-close>Отмена</button>
+        <button type="button" class="btn ghost" data-close>Отмена</button>
         <button type="submit" class="btn primary">Сохранить</button>
       </div>
     </form>
   </dialog>
 
-  <dialog id="details-dialog" class="wide">
+  <dialog id="details-dialog" class="wide" aria-labelledby="d-name">
     <div class="details">
       <div class="details-head">
         <div>
-          <div class="muted small" id="d-category"></div>
+          <div class="details-category" id="d-category"></div>
           <h2 id="d-name"></h2>
-          <a id="d-link" class="small" target="_blank" rel="noopener">Открыть в DNS ↗</a>
+          <a id="d-link" class="ext-link" target="_blank" rel="noopener">
+            Открыть в DNS<svg class="icon" aria-hidden="true"><use href="#i-external"/></svg>
+          </a>
         </div>
-        <button class="btn icon" data-close aria-label="Закрыть" autofocus>✕</button>
+        <button class="btn icon-only" data-close aria-label="Закрыть" autofocus>
+          <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
+        </button>
       </div>
       <div class="stats" id="d-stats"></div>
       <div id="d-chart" class="chart small-chart"></div>
-      <p id="d-debug" class="small muted" hidden>
-        Последняя неудачная проверка — что увидел браузер:
+      <p id="d-debug" class="debug-note" hidden>
+        Последняя проверка не удалась. Что увидел браузер:
         <a data-debug="png" target="_blank" rel="noopener">скриншот</a> ·
         <a data-debug="html" target="_blank" rel="noopener">HTML</a> ·
         <a data-debug="json" target="_blank" rel="noopener">ответы DNS</a>
       </p>
       <form id="manual-price" class="inline-form">
-        <input name="price" type="number" min="1" step="1" placeholder="Цена сейчас, ₽" required>
-        <input name="date" type="date">
+        <input name="price" type="number" min="1" step="1" inputmode="numeric" placeholder="Цена сейчас, ₽" aria-label="Цена сейчас, ₽" required>
+        <input name="date" type="date" aria-label="Дата цены">
         <button class="btn" type="submit">Записать цену вручную</button>
       </form>
       <h3>История проверок</h3>
@@ -159,13 +190,15 @@
       <div class="dialog-actions">
         <button class="btn danger" id="d-delete">Удалить</button>
         <span class="spacer"></span>
-        <button class="btn" id="d-refresh">Проверить сейчас</button>
+        <button class="btn" id="d-refresh">
+          <svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg>Проверить сейчас
+        </button>
         <button class="btn" id="d-edit">Изменить</button>
       </div>
     </div>
   </dialog>
 
-  <div id="toast" class="toast" hidden></div>
+  <div id="toast" class="toast" role="status" hidden></div>
 
   <script src="/static/vendor/lightweight-charts.standalone.production.js"></script>
   <script src="/static/app.js"></script>

@@ -42,6 +42,9 @@ const todayIso = () => {
 };
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const icon = (name, cls = "icon") => `<svg class="${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+const arrow = (v) => (v > 0 ? icon("up") : v < 0 ? icon("down") : "");
+const unsigned = (v) => (v == null ? "" : pctFmt.format(Math.abs(v)) + " %");
 
 function toast(text, ms = 4000) {
   const el = $("#toast");
@@ -56,7 +59,7 @@ function toast(text, ms = 4000) {
 function makeChart(container) {
   return LC.createChart(container, {
     autoSize: true,
-    layout: { background: { color: "transparent" }, textColor: css("--muted"), fontFamily: "inherit", attributionLogo: false },
+    layout: { background: { color: "transparent" }, textColor: css("--muted"), fontFamily: css("--mono"), fontSize: 11, attributionLogo: false },
     grid: { vertLines: { visible: false }, horzLines: { color: css("--border") } },
     rightPriceScale: { borderVisible: false },
     timeScale: { borderVisible: false },
@@ -68,7 +71,7 @@ function makeChart(container) {
 
 function areaColors(up) {
   const color = up ? css("--up") : css("--down");
-  return { lineColor: color, topColor: color + "55", bottomColor: color + "05" };
+  return { lineColor: color, topColor: color + "4d", bottomColor: color + "00" };
 }
 
 const mainChart = { chart: null, value: null, cost: null };
@@ -76,7 +79,9 @@ const mainChart = { chart: null, value: null, cost: null };
 function renderMainChart(series) {
   if (!mainChart.chart) {
     mainChart.chart = makeChart($("#main-chart"));
-    mainChart.value = mainChart.chart.addSeries(LC.AreaSeries, { lineWidth: 2, priceLineVisible: false });
+    mainChart.value = mainChart.chart.addSeries(LC.AreaSeries, {
+      lineWidth: 2, priceLineVisible: false, crosshairMarkerRadius: 5, crosshairMarkerBorderWidth: 2,
+    });
     mainChart.cost = mainChart.chart.addSeries(LC.LineSeries, {
       color: css("--cost"), lineWidth: 1, lineStyle: LC.LineStyle.Dashed, lineType: LC.LineType.WithSteps,
       priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
@@ -101,8 +106,8 @@ function applyRange() {
 }
 
 function sparkline(values, up) {
-  if (values.length < 2) return '<span class="muted small">—</span>';
-  const w = 110, h = 32, pad = 3;
+  if (values.length < 2) return '<span class="check">—</span>';
+  const w = 120, h = 34, pad = 3;
   const min = Math.min(...values), max = Math.max(...values);
   // At least ±3 % of the price, so a few rubles of noise do not look like a crash.
   const span = Math.max(max - min, ((min + max) / 2) * 0.06) || 1;
@@ -124,44 +129,74 @@ async function load() {
   renderSummary(data.summary);
   renderMainChart(data.series);
   renderPositions(data.components);
+  renderTicker(data.components);
   renderStatus(data.status);
 }
 
 function renderSummary(s) {
   $("#total-value").textContent = rub.format(s.value);
   $("#total-cost").textContent = rub.format(s.cost);
-  const chip = $("#total-change");
-  chip.className = "chip " + trend(s.change);
-  chip.textContent = `${signedRub(s.change)} (${signedPct(s.change_pct) || "0 %"})`;
+  const change = $("#total-change");
+  change.className = "quote-change " + trend(s.change);
+  change.innerHTML = s.cost
+    ? `${arrow(s.change)}<span>${signedRub(s.change)}</span><span class="pct">${signedPct(s.change_pct) || "0,0 %"}</span><span class="since">с момента сборки</span>`
+    : "";
   const day = $("#day-change");
-  day.className = "small " + trend(s.day_change);
-  day.textContent = s.day_change ? `· за день ${signedRub(s.day_change)} (${signedPct(s.day_change_pct)})` : "";
+  day.innerHTML = s.day_change
+    ? `за день <span class="${trend(s.day_change)}">${signedRub(s.day_change)} · ${signedPct(s.day_change_pct)}</span>`
+    : "";
 }
 
 function checkCell(c) {
   const lc = c.last_check;
-  if (!c.url) return '<span class="muted small">без ссылки</span>';
-  if (!lc) return '<span class="muted small">ещё не проверялось</span>';
-  if (lc.ok) return `<span class="check-ok small">${fmtDateTime(lc.checked_at)}</span>`;
+  if (!c.url) return '<span class="check">без ссылки</span>';
+  if (!lc) return '<span class="check">ещё не проверялось</span>';
+  if (lc.ok) return `<span class="check check-ok">${fmtDateTime(lc.checked_at)}</span>`;
   const why = lc.available === false ? "нет в наличии" : "ошибка";
-  return `<span class="check-bad small" title="${esc(lc.error || why)}">${fmtDateTime(lc.checked_at)} · ${why}</span>`;
+  return `<span class="check check-bad" title="${esc(lc.error || why)}">${fmtDateTime(lc.checked_at)} · ${why}</span>`;
 }
 
 function renderPositions(items) {
   $("#empty").hidden = items.length > 0;
   $("#positions").hidden = items.length === 0;
+  $("#count").textContent = items.length ? String(items.length) : "";
   $("#positions tbody").innerHTML = items.map((c) => {
     const t = trend(c.change);
-    const qty = c.quantity > 1 ? ` <span class="qty">× ${c.quantity}</span>` : "";
-    return `<tr data-id="${c.id}">
+    const qty = c.quantity > 1 ? ` <span class="qty">×${c.quantity}</span>` : "";
+    return `<tr data-id="${c.id}" tabindex="0">
       <td><div class="pos-name">${esc(c.name)}${qty}</div><div class="pos-sub">${esc(c.category || "")}${c.category ? " · " : ""}куплено ${fmtDate(c.purchase_date)}</div></td>
       <td class="num hide-sm">${rub.format(c.cost)}</td>
       <td class="num">${rub.format(c.value)}</td>
-      <td class="num ${t}"><div class="change-pct">${signedPct(c.change_pct) || "0,0 %"}</div><div class="small">${signedRub(c.change)}</div></td>
+      <td class="num ${t}"><div class="change-pct">${arrow(c.change)}${unsigned(c.change_pct) || "0,0 %"}</div><div class="change-abs">${signedRub(c.change)}</div></td>
       <td class="hide-sm">${sparkline(c.sparkline, c.change >= 0)}</td>
       <td class="hide-sm">${checkCell(c)}</td>
     </tr>`;
   }).join("");
+}
+
+// Short ticker label: drop the category word and the [model code] from the DNS name.
+function tickerName(c) {
+  let name = c.name.replace(/\s*\[.*?\]\s*/g, " ").trim();
+  if (c.category && name.toLowerCase().startsWith(c.category.toLowerCase() + " ")) {
+    name = name.slice(c.category.length + 1);
+  } else {
+    name = name.replace(/^(Видеокарта|Процессор|Материнская плата|Оперативная память|Блок питания|Корпус|Кулер для процессора|Вентилятор|SSD-накопитель|Монитор)\s+/i, "");
+  }
+  return name.length > 34 ? name.slice(0, 33).trimEnd() + "…" : name;
+}
+
+function renderTicker(items) {
+  const ticker = $("#ticker");
+  ticker.hidden = items.length === 0;
+  if (!items.length) return;
+  const chunk = (hidden) => items.map((c) => `<button class="tick" data-id="${c.id}"${hidden ? ' aria-hidden="true" tabindex="-1"' : ""}>
+      <span class="tick-name">${esc(tickerName(c))}</span>
+      <span class="tick-price">${num.format(c.current_price)}</span>
+      <span class="tick-chg ${trend(c.change)}">${arrow(c.change)}${unsigned(c.change_pct) || "0,0 %"}</span>
+    </button>`).join("");
+  // Two identical halves: the track slides by exactly one half and loops seamlessly.
+  $("#ticker-track").innerHTML = `<div class="ticker-half">${chunk(false)}</div><div class="ticker-half" aria-hidden="true">${chunk(true)}</div>`;
+  ticker.style.setProperty("--ticker-duration", `${Math.max(30, items.length * 7)}s`);
 }
 
 function renderStatus(st) {
@@ -269,9 +304,9 @@ async function openDetails(id) {
 
   const t = trend(c.change);
   $("#d-stats").innerHTML = `
-    <div class="stat"><div class="muted small">Купил за</div><div class="v">${rub.format(c.purchase_price)}</div><div class="small muted">${fmtDate(c.purchase_date)}</div></div>
-    <div class="stat"><div class="muted small">Сейчас в DNS</div><div class="v">${rub.format(c.current_price)}</div><div class="small muted">${c.priced_at ? fmtDate(c.priced_at) : "ещё нет данных"}</div></div>
-    <div class="stat"><div class="muted small">Изменение</div><div class="v ${t}">${signedPct(c.change_pct) || "0,0 %"}</div><div class="small ${t}">${signedRub(c.change)}</div></div>`;
+    <div class="stat"><div class="stat-label">Купил за</div><div class="v">${rub.format(c.purchase_price)}</div><div class="stat-sub">${fmtDate(c.purchase_date)}</div></div>
+    <div class="stat"><div class="stat-label">Сейчас в DNS</div><div class="v">${rub.format(c.current_price)}</div><div class="stat-sub">${c.priced_at ? fmtDate(c.priced_at) : "ещё нет данных"}</div></div>
+    <div class="stat"><div class="stat-label">Изменение</div><div class="v ${t}">${signedPct(c.change_pct) || "0,0 %"}</div><div class="stat-sub ${t}">${signedRub(c.change)}</div></div>`;
 
   const dlg = $("#details-dialog");
   if (!dlg.open) dlg.showModal();
@@ -294,15 +329,26 @@ async function openDetails(id) {
     ? c.history.map((p) => `<tr>
         <td>${fmtDateTime(p.checked_at)}</td>
         <td class="num">${p.price != null ? rub.format(p.price) : `<span class="down">${p.available === 0 ? "нет в наличии" : "—"}</span>`}</td>
-        <td class="muted">${sourceName[p.source] || p.source}${p.error ? ` · <span title="${esc(p.error)}">${esc(p.error.slice(0, 60))}</span>` : ""}</td>
-        <td class="num"><button class="del" data-price="${p.id}" title="Удалить запись">✕</button></td>
+        <td class="src">${sourceName[p.source] || p.source}${p.error ? ` · <span title="${esc(p.error)}">${esc(p.error.slice(0, 60))}</span>` : ""}</td>
+        <td class="num"><button class="del" data-price="${p.id}" title="Удалить запись" aria-label="Удалить запись">${icon("close")}</button></td>
       </tr>`).join("")
-    : '<tr><td class="muted">Проверок ещё не было</td></tr>';
+    : '<tr><td class="src">Проверок ещё не было</td></tr>';
 }
 
 $("#positions tbody").addEventListener("click", (ev) => {
   const row = ev.target.closest("tr[data-id]");
   if (row) openDetails(Number(row.dataset.id)).catch((e) => toast(e.message));
+});
+$("#positions tbody").addEventListener("keydown", (ev) => {
+  const row = ev.target.closest("tr[data-id]");
+  if (row && (ev.key === "Enter" || ev.key === " ")) {
+    ev.preventDefault();
+    openDetails(Number(row.dataset.id)).catch((e) => toast(e.message));
+  }
+});
+$("#ticker-track").addEventListener("click", (ev) => {
+  const tick = ev.target.closest(".tick[data-id]");
+  if (tick) openDetails(Number(tick.dataset.id)).catch((e) => toast(e.message));
 });
 
 $("#d-history").addEventListener("click", async (ev) => {
