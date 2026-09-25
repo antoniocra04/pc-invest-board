@@ -65,7 +65,8 @@ async def open_browser(settings: Settings, engine: str | None = None):
             headless=settings.headless,
             os="windows",
             locale="ru-RU",
-            config={"timezone": settings.tz_name},
+            # No timezone override: Firefox takes it from the container's TZ, and Camoufox warns
+            # that a manual timezone can give the browser away.
             humanize=True,
         ) as context:
             yield context
