@@ -9,7 +9,7 @@ const pctFmt = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1, minimu
 const dateFmt = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short", year: "numeric" });
 const dateTimeFmt = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
-const state = { data: null, rangeDays: 0, detailsId: null, editId: null, pollTimer: null };
+const state = { data: null, rangeDays: 0, detailsId: null, editId: null, pollTimer: null, beforeRun: null };
 
 // --- helpers -------------------------------------------------------------
 
@@ -74,7 +74,33 @@ function areaColors(up) {
   return { lineColor: color, topColor: color + "4d", bottomColor: color + "00" };
 }
 
-const mainChart = { chart: null, value: null, cost: null };
+const mainChart = { chart: null, value: null, cost: null, markers: null };
+
+// The day the portfolio was furthest above what was paid for it. Measured as a percentage,
+// not in rubles, so buying one more part does not count as a record.
+function findRecord(series) {
+  let best = null;
+  for (const p of series) {
+    if (!p.cost) continue;
+    const pct = (p.value / p.cost - 1) * 100;
+    if (pct > 0 && (!best || pct >= best.pct)) best = { date: p.date, pct, value: p.value };
+  }
+  return best;
+}
+
+function chartMarkers(series, components) {
+  const markers = [];
+  const dates = [...new Set(components.map((c) => c.purchase_date))].sort();
+  // Purchases sit on the chart's left edge, where a label would be cut off: the legend names them.
+  for (const date of dates) {
+    markers.push({ time: date, position: "belowBar", shape: "circle", color: css("--cost"), size: 0.8 });
+  }
+  const record = findRecord(series);
+  if (record && series.length > 1 && record.date !== series[0].date) {
+    markers.push({ time: record.date, position: "aboveBar", shape: "arrowDown", color: css("--up"), text: "рекорд" });
+  }
+  return markers.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
+}
 
 function renderMainChart(series) {
   if (!mainChart.chart) {
@@ -86,11 +112,14 @@ function renderMainChart(series) {
       color: css("--cost"), lineWidth: 1, lineStyle: LC.LineStyle.Dashed, lineType: LC.LineType.WithSteps,
       priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
     });
+    mainChart.markers = LC.createSeriesMarkers(mainChart.value, []);
+    mainChart.chart.timeScale().applyOptions({ rightOffset: 6 });  // room for the "рекорд" label
   }
   const last = series[series.length - 1];
   mainChart.value.applyOptions(areaColors(!last || last.value >= last.cost));
   mainChart.value.setData(series.map((p) => ({ time: p.date, value: p.value })));
   mainChart.cost.setData(series.map((p) => ({ time: p.date, value: p.cost })));
+  mainChart.markers.setMarkers(state.data ? chartMarkers(series, state.data.components) : []);
   applyRange();
 }
 
@@ -126,14 +155,14 @@ function sparkline(values, up) {
 async function load() {
   const data = await api("/api/portfolio");
   state.data = data;
-  renderSummary(data.summary);
+  renderSummary(data.summary, data.series);
   renderMainChart(data.series);
   renderPositions(data.components);
   renderTicker(data.components);
   renderStatus(data.status);
 }
 
-function renderSummary(s) {
+function renderSummary(s, series) {
   $("#total-value").textContent = rub.format(s.value);
   $("#total-cost").textContent = rub.format(s.cost);
   const change = $("#total-change");
@@ -145,6 +174,46 @@ function renderSummary(s) {
   day.innerHTML = s.day_change
     ? `за день <span class="${trend(s.day_change)}">${signedRub(s.day_change)} · ${signedPct(s.day_change_pct)}</span>`
     : "";
+  const record = findRecord(series);
+  const last = series[series.length - 1];
+  const el = $("#record");
+  if (!record || series.length < 2) {
+    el.innerHTML = "";
+  } else if (record.date === last.date) {
+    el.innerHTML = `<span class="record-badge">${icon("up")}рекорд подорожания</span>`;
+  } else {
+    el.innerHTML = `<span class="record-past">рекорд <b>${signedPct(record.pct)}</b> — ${fmtDate(record.date)}</span>`;
+  }
+}
+
+// --- what changed after a check the owner started ---------------------------
+
+function snapshot() {
+  if (!state.data) return null;
+  return {
+    prices: Object.fromEntries(state.data.components.map((c) => [c.id, c.priced_at ? c.current_price : null])),
+  };
+}
+
+function runSummary(before, data, st) {
+  const parts = [];
+  const fresh = data.components.filter((c) => before.prices[c.id] == null && c.priced_at);
+  for (const c of fresh.slice(0, 2)) {
+    parts.push(`Цена «${tickerName(c)}» — ${rub.format(c.current_price)}, это ${signedPct(c.change_pct)} к покупке.`);
+  }
+  const moved = data.components
+    .filter((c) => before.prices[c.id] != null && c.current_price !== before.prices[c.id])
+    .map((c) => ({ c, delta: (c.current_price - before.prices[c.id]) * c.quantity, pct: (c.current_price / before.prices[c.id] - 1) * 100 }));
+  if (moved.length) {
+    const delta = moved.reduce((sum, m) => sum + m.delta, 0);
+    const top = moved.reduce((a, b) => (Math.abs(b.pct) > Math.abs(a.pct) ? b : a));
+    const verb = delta > 0 ? "подорожала" : delta < 0 ? "подешевела" : "осталась при своих";
+    parts.push(`С прошлой проверки сборка ${verb}${delta ? " на " + rub.format(Math.abs(delta)) : ""}. Сильнее всех — «${tickerName(top.c)}»: ${signedPct(top.pct)}.`);
+  } else if (!fresh.length && st.last_run_ok) {
+    parts.push("Цены с прошлой проверки не изменились.");
+  }
+  if (st.last_run_failed) parts.push(`Не удалось проверить: ${st.last_run_failed} — подробности в таблице.`);
+  return parts.join(" ");
 }
 
 function checkCell(c) {
@@ -225,6 +294,11 @@ function startPolling() {
         clearInterval(state.pollTimer);
         state.pollTimer = null;
         await load();
+        if (state.beforeRun) {
+          const text = runSummary(state.beforeRun, state.data, st);
+          state.beforeRun = null;
+          if (text) toast(text, 9000);
+        }
         if (state.detailsId) openDetails(state.detailsId);
       } else {
         renderStatus(st);
@@ -234,11 +308,13 @@ function startPolling() {
 }
 
 async function refresh(componentId) {
+  state.beforeRun = snapshot();
   try {
     const st = await api("/api/refresh", { method: "POST", body: componentId ? { component_id: componentId } : {} });
     renderStatus(st);
     startPolling();
   } catch (e) {
+    state.beforeRun = null;
     toast(e.message);
   }
 }
@@ -275,6 +351,7 @@ $("#component-form").addEventListener("submit", async (ev) => {
     if (state.editId) {
       await api(`/api/components/${state.editId}`, { method: "PUT", body });
     } else {
+      state.beforeRun = snapshot();
       await api("/api/components", { method: "POST", body });
       if (body.url) toast("Добавил. Сейчас схожу в DNS за актуальной ценой — это займёт минуту.");
     }

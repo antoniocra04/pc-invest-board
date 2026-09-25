@@ -234,6 +234,14 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px 72px; }
 .quote-meta { display: flex; gap: 6px 18px; flex-wrap: wrap; margin: 10px 0 0; color: var(--muted); font-size: 14px; }
 .quote-meta b { color: var(--text); font-family: var(--mono); font-weight: 500; font-size: 13.5px; }
 .quote-meta .up, .quote-meta .down { font-family: var(--mono); font-size: 13.5px; }
+.record-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--up); background: var(--up-bg);
+  padding: 1px 9px 1px 7px; border-radius: 999px;
+  font-weight: 600; font-size: 13px;
+}
+.record-badge .icon { width: 13px; height: 13px; }
+.record-past b { color: var(--text); font-family: var(--mono); font-weight: 500; font-size: 13.5px; }
 
 .tabs { display: flex; gap: 2px; background: var(--panel-2); border-radius: 10px; padding: 3px; }
 .tabs button {
@@ -251,6 +259,7 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 24px 72px; }
 .swatch { display: inline-block; width: 16px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 7px; }
 .swatch.value { background: var(--up); }
 .swatch.cost { height: 0; border-top: 2px dashed var(--cost); border-radius: 0; }
+.swatch.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cost); margin-right: 7px; }
 
 /* --- buttons -------------------------------------------------------------- */
 
